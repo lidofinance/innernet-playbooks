@@ -1,0 +1,16 @@
+<network>
+  <name>{{ libvirt_network_name }}</name>
+  <uuid>{{ libvirt_network_name|to_uuid }}</uuid>
+  <forward mode='nat'/>
+  <bridge name='{{ libvirt_network_name }}' stp='off' delay='0'/>
+  <mac address='{{ "52:54:00"|random_mac(seed="inlab") }}'/>
+  <ip address='{{ hypervisor_ip }}' netmask='255.255.255.0'>
+    <dhcp>
+      {% for host in vm_group %}
+      <host mac='{{ "52:54:00"|random_mac(seed=host) }}' name='{{ host }}' ip='{{ hostvars[host].ansible_host }}'>
+        <lease expiry='100500' unit='hours'/>
+      </host>
+      {%endfor %}
+    </dhcp>
+  </ip>
+</network>

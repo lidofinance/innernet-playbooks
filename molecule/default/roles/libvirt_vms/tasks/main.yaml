@@ -1,0 +1,8 @@
+---
+- name: Define libvirt domain
+  delegate_to: "{{ hypervisor }}"
+  virt:
+    command: define
+    xml: '{{ lookup("template", "domain.xml.j2") }}'
+  tags: [define_vm]
+  notify: start domain

@@ -1,0 +1,82 @@
+---
+driver:
+  name: delegated  
+  options:
+    login_cmd_template: "ssh -l {user} {address} -p {port} -i {identity_file} -o UserKnownHostsFile=/dev/null -o ControlMaster=auto -o ControlPersist=60s -o ForwardX11=no -o       LogLevel=ERROR -o StrictHostKeyChecking=no"
+platforms:
+  - name: inn-auth1
+    groups:
+      - innernet_auth
+      - vm
+  - name: inn-srv2
+    groups:
+      - innernet_server
+      - vm
+  - name: inn-srv3
+    groups:
+      - innernet_server
+      - vm
+
+provisioner:
+  name: ansible
+  inventory:
+    hosts:
+      hypervisor:
+        hosts:
+          hypervisor0:
+            ansible_connection: local
+            hypervisor_ip: 100.64.25.254
+    group_vars:
+      all:
+        vm_image_file: /var/lib/libvirt/images/{{ inventory_hostname }}.qcow2
+        vm_image_size: 16G
+        vm_memory: 524288
+        golden_image_file: /var/lib/libvirt/images/ubuntu_golden.qcow2
+        virt_type: kvm   # qemu can be used, but it's very slow
+        libvirt_network_name: inlab_network
+        uuid: '{{ (inventory_hostname + "inlab")|to_uuid }}'
+    host_vars:
+      inn-auth1:
+        ansible_host: 100.64.25.1
+        ansible_user: ubuntu
+      inn-srv2:
+        ansible_host: 100.64.25.2
+        ansible_user: ubuntu
+      inn-srv3:
+        ansible_host: 100.64.25.3
+        ansible_user: ubuntu
+  config_options:
+    defaults:
+      host_key_checking: false
+      retry_files_enabled: false
+    ssh_connection:
+      pipelining: true
+  playbooks:
+    create: create.yml
+    destroy: destroy.yml
+    prepare: prepare.yml
+    converge: converge.yml
+
+verifier:
+  name: testinfra
+  options:
+    sudo: false
+    verbose: true
+    color: "yes"
+
+scenario:
+  create_sequence:
+    - create
+  converge_sequence:
+    - create
+    - prepare
+    - converge
+  destroy_sequence:
+    - destroy
+  test_sequence:
+    - create
+    - prepare
+    - converge
+    - idempotence
+    - verify
+    - destroy

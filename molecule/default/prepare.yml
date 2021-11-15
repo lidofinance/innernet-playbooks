@@ -1,0 +1,11 @@
+---
+- name: Wait until VM boot
+  hosts: vm
+  gather_facts: false
+  tasks:
+    - name: Wait for connection
+      wait_for_connection:
+    - name: Update apt cache
+      become: true
+      apt:
+        update_cache: true

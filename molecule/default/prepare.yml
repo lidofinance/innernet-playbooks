@@ -8,4 +8,6 @@
     - name: Update apt cache
       become: true
       apt:
+        name: iputils-ping
+        state: present
         update_cache: true

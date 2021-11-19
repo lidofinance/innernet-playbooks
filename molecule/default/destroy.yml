@@ -1,0 +1,46 @@
+---
+- hosts: vm
+  gather_facts: false
+  become: true
+  serial: 1
+  vars:
+    hypervisor: '{{ groups.hypervisor[0] }}'
+  tasks:
+    - name: Shutdown VMs
+      delegate_to: "{{ hypervisor }}"
+      virt:
+        name: "{{ inventory_hostname }}"
+        state: destroyed
+      tags: [shutdown]
+
+    - name: Undefine domains
+      delegate_to: "{{ hypervisor }}"
+      virt:
+        name: "{{ inventory_hostname }}"
+        command: undefine
+
+    - name: Delete files
+      delegate_to: "{{ hypervisor }}"
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - "{{ vm_image_file }}"
+        - "/var/lib/libvirt/images/{{ inventory_hostname }}.cloud-config.iso"
+        - /tmp/{{ inventory_hostname }}_config/
+
+- hosts: hypervisor
+  gather_facts: false
+  become: true
+  serial: 1
+  tasks:
+    - name: Stop network
+      virt_net:
+        name: vm_network
+        state: inactive
+
+    - name: Undefine network
+      virt_net:
+        name: vm_network
+        state: absent
+

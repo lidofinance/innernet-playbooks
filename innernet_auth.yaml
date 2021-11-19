@@ -1,0 +1,152 @@
+---
+- name: Install and configure innernet-auth server
+  hosts: innernet_auth
+  gather_facts: false
+  tags: [innernet]
+  tasks:
+    - name: install packages
+      become: true
+      apt:
+        name:
+          - sqlite3
+          - wireguard-tools
+        state: present
+        cache_valid_time: 3600
+    - name: check if innernet is installed
+      package_facts:
+        manager: apt
+        strategy: first
+
+    - name: Install innernet client
+      become: true
+      apt:
+        deb: https://github.com/tonarino/innernet/releases/download/v1.5.1/innernet_1.5.1_amd64.deb
+        state: present
+      when: ('innernet' not in ansible_facts.packages)  # to avoid excessive download of deb from github
+
+    - name: Install innernet-server
+      become: true
+      apt:
+        deb: https://github.com/tonarino/innernet/releases/download/v1.5.1/innernet-server_1.5.1_amd64.deb
+        state: present
+      when: ('innernet-server' not in ansible_facts.packages)
+
+    - name: Initialize new innernet database
+      become: true
+      command:
+        innernet-server
+          new
+          --network-name {{ innernet_network_name }}
+          --network-cidr {{ innernet_network_cidr }}
+          --external-endpoint {{ innernet_external_ip|d(ansible_host) }}:{{ innernet_port|d(51820) }}
+          --listen-port {{ innernet_port|d(51820) }}
+      args:
+        creates: /var/lib/innernet-server/{{ innernet_network_name }}.db
+
+    - name: Create directories
+      become: true
+      file:
+        path: '{{ item }}'
+        state: directory
+        mode: 0700
+        owner: root
+        group: root
+      loop:
+        - /etc/innernet/
+        - /var/lib/innernet/
+
+    - name: start innernet-server
+      become: true
+      systemd:
+        name: innernet-server@{{ innernet_network_name }}.service
+        state: started
+        enabled: true
+        daemon_reload: true
+
+    - name: Extract server public key
+      become: true
+      command: wg show {{ innernet_network_name }} public-key
+      register: public_key
+      changed_when: false
+
+    - name: Configure client binary on server
+      become: true
+      copy:
+        content: |
+          [interface]
+          network-name = "{{ innernet_network_name }}"
+          address = "{{ innernet_network_cidr|ipaddr('address') }}"
+          private-key = ""
+
+          [server]
+          public-key = "{{ public_key.stdout.strip() }}"
+          external-endpoint = "{{ innernet_external_ip|d(ansible_host) }}:{{ innernet_port|d(51820) }}"
+          internal-endpoint = "{{ innernet_network_cidr|ipaddr('address')|ipwrap() }}:{{ innernet_port|d(51820) }}"
+        dest: /etc/innernet/{{ innernet_network_name }}.conf
+        owner: root
+        group: root
+        mode: '0600'
+
+    - name: Fetching data
+      become: true
+      command: innernet fetch {{ innernet_network_name }}
+      register: existing_cidrs
+      changed_when: false
+
+    - name: Get existing cidrs
+      become: true
+      command: innernet list-cidrs {{ innernet_network_name }}
+      register: existing_cidrs
+      changed_when: false
+
+    - name: Create servers cidr
+      become: true
+      command:
+        innernet-server add-cidr
+          --name {{ innernet_servers_cidr_name }}
+          --cidr {{ innernet_servers_cidr }}
+          --parent {{ innernet_network_name }}
+          --yes
+          {{ innernet_network_name }}
+      when: innernet_servers_cidr not in existing_cidrs.stdout
+
+    - name: Create all-users cidr
+      become: true
+      command:
+        innernet-server add-cidr
+          --name {{ innernet_users_cidr_name }}
+          --cidr {{ innernet_users_cidr }}
+          --parent {{ innernet_network_name }}
+          --yes
+          {{ innernet_network_name }}
+      when: innernet_users_cidr not in existing_cidrs.stdout
+
+    - name: Create per-user cidrs
+      become: true
+      command:
+        innernet-server add-cidr
+          --name {{ item.name }}
+          --cidr {{ item.cidr }}
+          --parent {{ innernet_users_cidr_name }}
+          --yes
+          {{ innernet_network_name }}
+      when: item.cidr not in existing_cidrs.stdout
+      loop: '{{ innernet_users|d([]) }}'
+
+    - name: Get list of associations
+      become: true
+      command: innernet list-associations {{ innernet_network_name }}
+      register: associations
+      changed_when: false
+
+    - name: Create association for users and servers
+      become: true
+      command:
+        innernet add-association {{ innernet_network_name }} {{ innernet_servers_cidr_name }} {{ innernet_users_cidr_name }}
+      when: (innernet_servers_cidr_name + ' <=> ' + innernet_users_cidr_name) not in associations.stdout
+
+    - name: Create association for servers
+      become: true
+      command:
+        innernet add-association {{ innernet_network_name }} {{ innernet_servers_cidr_name }} {{ innernet_servers_cidr_name }}
+      when: (innernet_servers_cidr_name + ' <=> ' + innernet_servers_cidr_name) not in associations.stdout

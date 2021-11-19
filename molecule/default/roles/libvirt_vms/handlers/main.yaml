@@ -1,0 +1,8 @@
+---
+- name: start domain
+  delegate_to: "{{ hypervisor }}"
+  virt:
+    command: define
+    name: "{{ inventory_hostname }}"
+    state: running
+    autostart: true

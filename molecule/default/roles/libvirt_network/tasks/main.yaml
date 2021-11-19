@@ -1,0 +1,17 @@
+---
+- name: Create network
+  virt_net:
+    name: inlab_network
+    xml: '{{ lookup("template", "network.xml.j2") }}'
+    command: define
+
+- name: Start network
+  virt_net:
+    name: '{{ libvirt_network_name }}'
+    state: active
+    autostart: true
+
+- name: Make network autostart
+  virt_net:
+    name: '{{ libvirt_network_name }}'
+    autostart: true

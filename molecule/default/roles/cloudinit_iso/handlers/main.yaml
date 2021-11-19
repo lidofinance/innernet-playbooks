@@ -1,0 +1,9 @@
+---
+- name: regenerate iso
+  become: true
+  delegate_to: "{{ hypervisor }}"
+  command: mkisofs
+    -o /var/lib/libvirt/images/{{ inventory_hostname }}.cloud-config.iso
+    -V cidata
+    -r -J --quiet
+    /tmp/{{ inventory_hostname }}_config/

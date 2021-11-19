@@ -1,0 +1,12 @@
+---
+- name: Clone VM image from golden image
+  become: true
+  delegate_to: "{{ hypervisor }}"
+  command: |
+    /usr/bin/qemu-img create \
+    -F qcow2 -f qcow2 \
+    -b {{ golden_image_file }} \
+    '{{ vm_image_file }}' \
+    {{ vm_image_size }}
+  args:
+    creates: "{{ vm_image_file }}"

@@ -1,0 +1,11 @@
+ansible
+pytest
+pytest-testinfra
+netaddr
+requests
+ansible-lint
+yamllint
+black
+molecule
+libvirt-python
+lxml

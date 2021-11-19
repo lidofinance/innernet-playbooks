@@ -1,0 +1,87 @@
+---
+- name: Install and configure innernet for regular servers
+  hosts: innernet_members,!innernet_auth
+  gather_facts: false
+  vars:
+    innernet_auth_server: '{{ groups["innernet_auth"][0] }}'
+    innernet_invite_path: /var/lib/innernet_invite_for_{{ inventory_hostname }}.invite
+    innernet_server_invite_expiration_time: 61s
+  tags: [innernet]
+  tasks:
+    - name: Check if innernet configured
+      become: true
+      stat:
+        path: /etc/innernet/{{ innernet_network_name }}.conf
+      register: innernet_config
+
+    - name: Stop if innernet configured
+      meta: end_host
+      when: innernet_config.stat.exists
+
+    - name: check if innernet is installed
+      package_facts:
+        manager: apt
+        strategy: first
+
+    - name: Install client
+      become: true
+      apt:
+        deb: https://github.com/tonarino/innernet/releases/download/v1.4.1/innernet_1.4.1_amd64.deb
+        state: present
+      when: ('innernet' not in ansible_facts.packages)  # to avoid excessive download of deb from github
+
+    - name: Remove stale invite
+      delegate_to: "{{ innernet_auth_server }}"
+      become: true
+      file:
+        path: "{{ innernet_invite_path }}"
+        state: absent
+
+    - name: Create invite for the server
+      delegate_to: "{{ innernet_auth_server }}"
+      become: true
+      command: innernet add-peer
+        --name '{{ inventory_hostname }}'
+        --ip '{{ innernet_ip }}'
+        --cidr '{{ innernet_servers_cidr_name }}'
+        --invite-expires {{ innernet_server_invite_expiration_time }}
+        --save-config '{{ innernet_invite_path }}'
+        --admin false
+        --yes
+        '{{ innernet_network_name }}'
+      register: res
+      changed_when: res.rc==0
+
+    - name: Fetch invite
+      become: true
+      delegate_to: "{{ innernet_auth_server }}"
+      shell: |
+        cat '{{ innernet_invite_path }}'
+        rm '{{ innernet_invite_path }}'
+      register: invite
+      changed_when: invite.rc==0
+
+    - name: Save invite
+      become: true
+      copy:
+        content: "{{ invite.stdout }}"
+        dest: "{{ innernet_invite_path }}"
+        owner: root
+        group: root
+        mode: "0600"
+
+    - name: Accept invite
+      become: true
+      throttle: 1
+      command: innernet
+        install
+        --default-name
+        --delete-invite
+        '{{ innernet_invite_path }}'
+      register: res
+      changed_when: res.rc==0
+
+    - name: Activate systemd unit
+      become: true
+      systemd:
+        name: innernet@{{ innernet_network_name }}

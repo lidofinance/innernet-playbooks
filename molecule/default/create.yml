@@ -1,0 +1,83 @@
+---
+- name: Install and configure libvirt with QEMU
+  hosts: hypervisor
+  gather_facts: true
+  become: true
+  pre_tasks:
+    - name: Install packages
+      become: true
+      apt:
+        name:
+          - sudo
+          - qemu-system-x86
+          - libvirt-daemon
+          - libvirt-dev
+          - libvirt-daemon-system
+          - genisoimage
+          - libvirt-daemon
+          - eatmydata
+          - python3-libvirt
+          - python3-diskimage-builder
+          - python3-lxml
+        state: present
+        update_cache: true
+      tags: apt
+    - name: Fix mkisofs symlink
+      become: true
+      file:
+        src: genisoimage
+        path: /usr/bin/mkisofs
+        state: link
+        owner: root
+        group: root
+
+    - name: Create an image
+      become: true
+      command: /usr/bin/disk-image-create
+        -o '{{ golden_image_file }}'
+        ubuntu-minimal vm cloud-init cloud-init-datasources -p openssh-server,gpg-agent,curl devuser
+      args:
+        creates: "{{ golden_image_file }}"
+      environment:
+        DIB_RELEASE: "focal"
+        DIB_CLOUD_INIT_DATASOURCES: NoCloud,ConfigDrive
+        # DIB_DEV_USER_USERNAME: debug
+        # DIB_DEV_USER_PASSWORD: pass4234
+        # DIB_DEV_USER_PWDLESS_SUDO: 'true'
+
+  roles:
+    - role: libvirt_network
+      vm_group: '{{ groups.vm }}'
+
+- name: Create VMs
+  hosts: vm
+  become: true
+  gather_facts: false
+  vars:
+    hypervisor: '{{ groups.hypervisor[0] }}'
+  pre_tasks:
+    - name: Search for ssh key
+      run_once: true
+      set_fact:
+        public_key: '{{ lookup("pipe", "ssh-add -L | grep ssh-rsa |head -1") }}'
+  roles:
+    - role: cloudinit_iso
+    - role: vm_image
+    - role: libvirt_vms
+  
+- name: Configure molecule
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: instance config
+      copy:
+        content: |
+          ---
+          {% for host in groups.vm %}
+          - instance: "{{ host }}"
+            address: "{{ hostvars[host].ansible_host }}"
+            port: 22
+            user: "{{ hostvars[host].ansible_user }}"
+            identity_file:
+          {% endfor %}
+        dest: "{{ molecule_instance_config }}"

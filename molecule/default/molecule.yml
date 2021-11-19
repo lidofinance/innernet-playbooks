@@ -1,0 +1,96 @@
+---
+driver:
+  name: delegated  
+  options:
+    login_cmd_template: "ssh -l {user} {address} -p {port} -i {identity_file} -o UserKnownHostsFile=/dev/null -o ControlMaster=auto -o ControlPersist=60s -o ForwardX11=no -o       LogLevel=ERROR -o StrictHostKeyChecking=no"
+platforms:
+  - name: inn-auth1
+    groups:
+      - innernet_auth
+      - vm
+      - innernet
+  - name: inn-srv2
+    groups:
+      - innernet_members
+      - vm
+      - innernet
+  - name: inn-srv3
+    groups:
+      - innernet_members
+      - vm
+      - innernet
+
+provisioner:
+  name: ansible
+  inventory:
+    hosts:
+      hypervisor:
+        hosts:
+          hypervisor0:
+            ansible_connection: local
+            hypervisor_ip: 100.64.25.254
+    group_vars:
+      all:
+        vm_image_file: /var/lib/libvirt/images/{{ inventory_hostname }}.qcow2
+        vm_image_size: 16G
+        vm_memory: 524288
+        golden_image_file: /var/lib/libvirt/images/ubuntu_golden.qcow2
+        virt_type: kvm   # qemu can be used, but it's very slow
+        libvirt_network_name: inlab_network
+        uuid: '{{ (inventory_hostname + "inlab")|to_uuid }}'
+        innernet_external_ip: '{{ ansible_host }}'
+      innernet:
+         innernet_network_name: inlab
+         innernet_network_cidr: fd43:fb1a:2278::/48 # DO NOT REUSE, generate your own with 'ULA ipv6 generators'
+         innernet_servers_cidr_name: servers
+         innernet_servers_cidr: fd43:fb1a:2278:f000::/56
+         innernet_users_cidr_name: users
+         innernet_users_cidr: fd43:fb1a:2278:1000::/56
+
+    host_vars:
+      inn-auth1:
+        ansible_host: 100.64.25.1
+        ansible_user: ubuntu
+      inn-srv2:
+        ansible_host: 100.64.25.2
+        ansible_user: ubuntu
+        innernet_ip: fd43:fb1a:2278:f000::2
+      inn-srv3:
+        ansible_host: 100.64.25.3
+        ansible_user: ubuntu
+        innernet_ip: fd43:fb1a:2278:f000::3
+  config_options:
+    defaults:
+      host_key_checking: false
+      retry_files_enabled: false
+    ssh_connection:
+      pipelining: true
+  playbooks:
+    create: create.yml
+    destroy: destroy.yml
+    prepare: prepare.yml
+    converge: converge.yml
+
+verifier:
+  name: testinfra
+  options:
+    sudo: false
+    verbose: true
+    color: "yes"
+
+scenario:
+  create_sequence:
+    - create
+  converge_sequence:
+    - create
+    - prepare
+    - converge
+  destroy_sequence:
+    - destroy
+  test_sequence:
+    - create
+    - prepare
+    - converge
+    - idempotence
+    - verify
+    - destroy

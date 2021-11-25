@@ -5,7 +5,7 @@
   vars:
     innernet_auth_server: '{{ groups["innernet_auth"][0] }}'
     innernet_invite_path: /var/lib/innernet_invite_for_{{ inventory_hostname }}.invite
-    innernet_server_invite_expiration_time: 61s
+    innernet_server_invite_expiration_time: 121s
   tags: [innernet]
   tasks:
     - name: Check if innernet configured
@@ -69,7 +69,6 @@
         owner: root
         group: root
         mode: "0600"
-
     - name: Accept invite
       become: true
       throttle: 1
@@ -79,6 +78,9 @@
         --delete-invite
         '{{ innernet_invite_path }}'
       register: res
+      until: res.rc==0
+      delay: 3
+      retries: 20
       changed_when: res.rc==0
 
     - name: Activate systemd unit

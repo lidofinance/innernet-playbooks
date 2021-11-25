@@ -75,13 +75,13 @@
         content: |
           [interface]
           network-name = "{{ innernet_network_name }}"
-          address = "{{ innernet_network_cidr|ipaddr('address') }}"
+          address = "{{ innernet_network_cidr|ipaddr('next_usable') }}"
           private-key = ""
 
           [server]
           public-key = "{{ public_key.stdout.strip() }}"
           external-endpoint = "{{ innernet_external_ip|d(ansible_host) }}:{{ innernet_port|d(51820) }}"
-          internal-endpoint = "{{ innernet_network_cidr|ipaddr('address')|ipwrap() }}:{{ innernet_port|d(51820) }}"
+          internal-endpoint = "{{ innernet_network_cidr|ipaddr('next_usable')|ipaddr('address')|ipwrap() }}:{{ innernet_port|d(51820) }}"
         dest: /etc/innernet/{{ innernet_network_name }}.conf
         owner: root
         group: root
@@ -89,9 +89,12 @@
 
     - name: Fetching data
       become: true
-      command: innernet fetch {{ innernet_network_name }}
+      command:
+        cmd: innernet fetch {{ innernet_network_name }}
+        # creates: /var/lib/innernet/{{ innernet_network_name }}.json
       register: existing_cidrs
-      changed_when: false
+
+    - meta: flush_handlers
 
     - name: Get existing cidrs
       become: true
@@ -150,3 +153,9 @@
       command:
         innernet add-association {{ innernet_network_name }} {{ innernet_servers_cidr_name }} {{ innernet_servers_cidr_name }}
       when: (innernet_servers_cidr_name + ' <=> ' + innernet_servers_cidr_name) not in associations.stdout
+
+    - name: restart innernet-server
+      become: true
+      systemd:
+        name: innernet-server@{{ innernet_network_name }}
+        state: restarted

@@ -87,3 +87,9 @@
       become: true
       systemd:
         name: innernet@{{ innernet_network_name }}
+
+    - name: Update cache
+      become: true
+      command:
+        cmd: innernet fetch {{ innernet_network_name }}
+      changed_when: false

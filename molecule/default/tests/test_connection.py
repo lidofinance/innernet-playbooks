@@ -15,6 +15,6 @@ def peers(host):
 
 def test_ok(host, peers):
     for peer in peers:
-        res = host.run(f'ping -c 2 {peer}')
+        res = host.run(f'/usr/bin/ping -c 2 -w 2 -i 0.2 {peer}')
         if res.rc:
-            pytest.fail(res.stderr)
+            pytest.fail(res.stdout)

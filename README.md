@@ -61,11 +61,13 @@ I hope they would be resolved soon.
 
 # How to try
 
-You need to create your own inventory with all machines you
-want to include in the network, and fill required values. See examples/.
+You need to run this from host with installed libvirt and qemu.
+Whilst it's possible to run it on machine without hardware-accelerated
+virtualization, it's going to be very slow (and it's required updating
+VM templates), so, pratically, 'VT' is must.
 
-You may want to use axullary 'libvirt' example to spawn locally few
-VMs with innernet between them.
+VMs are created and destroyed by [Molecule](https://molecule.readthedocs.io/en/latest/).
+Just run `molecule create` or `molecule converge`.
 
 # How to use in production
 You need to add groups `innernet-auth` and `innernet-servers` to

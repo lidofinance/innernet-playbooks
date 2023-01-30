@@ -26,7 +26,7 @@
     - name: Install client
       become: true
       apt:
-        deb: https://github.com/tonarino/innernet/releases/download/v1.4.1/innernet_1.4.1_amd64.deb
+        deb: https://github.com/tonarino/innernet/releases/download/v1.5.5/innernet_1.5.5_amd64.deb
         state: present
       when: ('innernet' not in ansible_facts.packages)  # to avoid excessive download of deb from github
 

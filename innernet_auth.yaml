@@ -75,7 +75,7 @@
         content: |
           [interface]
           network-name = "{{ innernet_network_name }}"
-          address = "{{ innernet_network_cidr|ipaddr('address') }}"
+          address = "{{ innernet_network_cidr|ipaddr('0') }}"
           private-key = ""
 
           [server]

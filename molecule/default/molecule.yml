@@ -91,6 +91,7 @@ scenario:
     - create
     - prepare
     - converge
-    # - idempotence  need fixing
+    - idempotence
+    - side_effect
     - verify
     - destroy

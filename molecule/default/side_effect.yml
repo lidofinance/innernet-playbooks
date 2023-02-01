@@ -1,2 +1,2 @@
 ---
-- import_playbook: ../../innernet_members.yaml
+- import_playbook: ../../playbooks/innernet_members.yaml

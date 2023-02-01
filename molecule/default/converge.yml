@@ -1,2 +1,2 @@
 ---
-- import_playbook: ../../innernet_auth.yaml
+- import_playbook: ../../playbooks/innernet_auth.yaml
